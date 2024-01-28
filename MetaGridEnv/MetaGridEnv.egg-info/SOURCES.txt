@@ -1,0 +1,11 @@
+setup.py
+MetaGridEnv/Environment_obstacles.py
+MetaGridEnv/__init__.py
+MetaGridEnv/building_blocks_obstacles.py
+MetaGridEnv/domain_creation_obstacles.py
+MetaGridEnv/metagrid_gymnasium_wrapper.py
+MetaGridEnv.egg-info/PKG-INFO
+MetaGridEnv.egg-info/SOURCES.txt
+MetaGridEnv.egg-info/dependency_links.txt
+MetaGridEnv.egg-info/requires.txt
+MetaGridEnv.egg-info/top_level.txt
