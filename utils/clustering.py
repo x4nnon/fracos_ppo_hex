@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 # from cuml.cluster import hdbscan
 import hdbscan
-import umap.umap_ as umap
+# import umap.umap_ as umap
 import random
 # from umap.parametric_umap import ParametricUMAP
 
@@ -367,256 +367,256 @@ def tSNE_reduction(X, verbose=False):
     print("TSNE IS DEPRECATED - USE UMAP")
     pass
 
-def umap_reduction(X, parametric=False):
+# def umap_reduction(X, parametric=False):
     
-    if parametric:
-        print("ERROR THIS HAS NOT BEEN IMPLEMENTED CORRECTLY YET!")
-        # reducer = ParametricUMAP(random_state=42, low_memory=True,
-        #                          unique=True,
-        #                          # parametric_reconstruction= True,
-        #                          )
+#     if parametric:
+#         print("ERROR THIS HAS NOT BEEN IMPLEMENTED CORRECTLY YET!")
+#         # reducer = ParametricUMAP(random_state=42, low_memory=True,
+#         #                          unique=True,
+#         #                          # parametric_reconstruction= True,
+#         #                          )
     
-        X = np.array(X)
+#         X = np.array(X)
         
-    else:
-        # print("ERROR have temp removed umap functions")
-        reducer = umap.UMAP(random_state=42, n_neighbors=20, min_dist=0.15)
-        # reducer = None
+#     else:
+#         # print("ERROR have temp removed umap functions")
+#         reducer = umap.UMAP(random_state=42, n_neighbors=20, min_dist=0.15)
+#         # reducer = None
 
-    embedding = reducer.fit_transform(X)
-    return embedding, reducer
+#     embedding = reducer.fit_transform(X)
+#     return embedding, reducer
 
-def produce_umap_reducer_pipeline(method, opt_num_of_trajs, rand_num_of_trajs, env,
-                                  max_ep_length,
-                                  model_path, umap_save_location, env_name,
-                                  plotit=False, shuffle=True, max_train_steps=1e4,
-                                  MAX_DEPTH=1, CURRENT_DEPTH=0, saved_traj_dir = None,
-                                  create_random_trajs = True, failure_min=4, evalu=True,
-                                  vae_path="pretrained/VAE/MetaGridEnv/vae_cnn.torch"):
+# def produce_umap_reducer_pipeline(method, opt_num_of_trajs, rand_num_of_trajs, env,
+#                                   max_ep_length,
+#                                   model_path, umap_save_location, env_name,
+#                                   plotit=False, shuffle=True, max_train_steps=1e4,
+#                                   MAX_DEPTH=1, CURRENT_DEPTH=0, saved_traj_dir = None,
+#                                   create_random_trajs = True, failure_min=4, evalu=True,
+#                                   vae_path="pretrained/VAE/MetaGridEnv/vae_cnn.torch"):
     
-    # Typically you want the rand_num_of_trajs to scale with how long the episode 
-    # is gonna be go random - on a maze you need less random,
-    # but on cartpole you want it longer - as it will fail earlier
+#     # Typically you want the rand_num_of_trajs to scale with how long the episode 
+#     # is gonna be go random - on a maze you need less random,
+#     # but on cartpole you want it longer - as it will fail earlier
     
-    if saved_traj_dir is not None:
-        optimal_ep_rewards = []
-        optimal_trajectories = []
-        for file in os.listdir(saved_traj_dir + "/rew"): # rew and traj are the same
-            rew_path = saved_traj_dir + "/rew/" + file
-            traj_path = saved_traj_dir + "/traj/" + file
-            rew_content = pickle.load(open(rew_path, "rb"))
-            traj_content = pickle.load(open(traj_path, "rb"))
+#     if saved_traj_dir is not None:
+#         optimal_ep_rewards = []
+#         optimal_trajectories = []
+#         for file in os.listdir(saved_traj_dir + "/rew"): # rew and traj are the same
+#             rew_path = saved_traj_dir + "/rew/" + file
+#             traj_path = saved_traj_dir + "/traj/" + file
+#             rew_content = pickle.load(open(rew_path, "rb"))
+#             traj_content = pickle.load(open(traj_path, "rb"))
             
-            optimal_ep_rewards += rew_content
-            optimal_trajectories += traj_content
+#             optimal_ep_rewards += rew_content
+#             optimal_trajectories += traj_content
             
     
-    else:    
-        if shuffle:
-            optimal_trajectories, optimal_ep_rewards = create_trajectories(method, opt_num_of_trajs,
-                                                           model_path, env, max_ep_length,
-                                                           obs_space=False, evalu=evalu)
-        else:
-            optimal_trajectories, optimal_ep_rewards = create_ind_opt_trajectories(method, opt_num_of_trajs,
-                                                                          env_name, max_ep_length,
-                                                                          max_train_steps,
-                                                                          MAX_DEPTH, CURRENT_DEPTH, verbose=False)  
+#     else:    
+#         if shuffle:
+#             optimal_trajectories, optimal_ep_rewards = create_trajectories(method, opt_num_of_trajs,
+#                                                            model_path, env, max_ep_length,
+#                                                            obs_space=False, evalu=evalu)
+#         else:
+#             optimal_trajectories, optimal_ep_rewards = create_ind_opt_trajectories(method, opt_num_of_trajs,
+#                                                                           env_name, max_ep_length,
+#                                                                           max_train_steps,
+#                                                                           MAX_DEPTH, CURRENT_DEPTH, verbose=False)  
     
-    if create_random_trajs:
-        random_trajectories, random_ep_rewards = create_random_trajectories(method, rand_num_of_trajs,
-                                                       model_path, env, max_ep_length,
-                                                       obs_space=False)
-        all_trajectories = optimal_trajectories + random_trajectories
-    else:
-        random_trajectories = []
-        random_ep_rewards = []
-        all_trajectories = optimal_trajectories
+#     if create_random_trajs:
+#         random_trajectories, random_ep_rewards = create_random_trajectories(method, rand_num_of_trajs,
+#                                                        model_path, env, max_ep_length,
+#                                                        obs_space=False)
+#         all_trajectories = optimal_trajectories + random_trajectories
+#     else:
+#         random_trajectories = []
+#         random_ep_rewards = []
+#         all_trajectories = optimal_trajectories
         
-    all_ep_rewards = optimal_ep_rewards + random_ep_rewards
-    all_fractures, corre_traj = create_fractures(all_trajectories, env_name, vae_path=vae_path)
-    concat_fractures = sum(all_fractures, [])
+#     all_ep_rewards = optimal_ep_rewards + random_ep_rewards
+#     all_fractures, corre_traj = create_fractures(all_trajectories, env_name, vae_path=vae_path)
+#     concat_fractures = sum(all_fractures, [])
 
-    embedding, reducer = umap_reduction(concat_fractures)
+    # embedding, reducer = umap_reduction(concat_fractures)
     
     
-    all_s_f = get_all_s_f_index(concat_fractures, all_ep_rewards, failure_std_threshold=None,
-                                use_std=False, failure_min=failure_min)
-    # for i in range(len(optimal_trajectories)):
-    #     for j in range(len(optimal_trajectories[i])):
-    #         all_s_f.append(1)
-    # for i in range(len(random_trajectories)):
-    #     for j in range(len(random_trajectories[i])):
-    #         all_s_f.append(0)
+    # all_s_f = get_all_s_f_index(concat_fractures, all_ep_rewards, failure_std_threshold=None,
+    #                             use_std=False, failure_min=failure_min)
+    # # for i in range(len(optimal_trajectories)):
+    # #     for j in range(len(optimal_trajectories[i])):
+    # #         all_s_f.append(1)
+    # # for i in range(len(random_trajectories)):
+    # #     for j in range(len(random_trajectories[i])):
+    # #         all_s_f.append(0)
 
-    if plotit:
-        plot_umap(embedding, all_s_f, env_name)
+    # if plotit:
+    #     plot_umap(embedding, all_s_f, env_name)
         
-    return embedding, reducer, all_ep_rewards, all_trajectories, all_s_f
+    # return embedding, reducer, all_ep_rewards, all_trajectories, all_s_f
 
-def produce_umap_reducer_pipeline_multi(method, checkpoints, env,
-                                        umap_save_location, env_name, labels, even=True,
-                                        vae_path=None, num_of_trajs=None, max_timesteps=20000,
-                                        rew_gen_meta=True, evalu=True, chain_length=2, include_rand_agent=True,
-                                        one_level=True, offline_path=None, 
-                                        min_traj_len=None):
+# def produce_umap_reducer_pipeline_multi(method, checkpoints, env,
+#                                         umap_save_location, env_name, labels, even=True,
+#                                         vae_path=None, num_of_trajs=None, max_timesteps=20000,
+#                                         rew_gen_meta=True, evalu=True, chain_length=2, include_rand_agent=True,
+#                                         one_level=True, offline_path=None, 
+#                                         min_traj_len=None):
      
-    colors = [
-    'blue', 'orange', 'green', 'red', 'purple',
-    'brown', 'pink', 'gray', 'olive', 'cyan',
-    'lime', 'teal', 'indigo', 'maroon', 'gold',
-    'navy', 'salmon', 'darkgreen', 'orchid', 'sienna'
-    ]
+#     colors = [
+#     'blue', 'orange', 'green', 'red', 'purple',
+#     'brown', 'pink', 'gray', 'olive', 'cyan',
+#     'lime', 'teal', 'indigo', 'maroon', 'gold',
+#     'navy', 'salmon', 'darkgreen', 'orchid', 'sienna'
+#     ]
     
-    list_of_trajectories = []
-    list_of_rewards = []
-    list_of_fractures = []
-    list_of_concat_fractures = []
+#     list_of_trajectories = []
+#     list_of_rewards = []
+#     list_of_fractures = []
+#     list_of_concat_fractures = []
     
-    if offline_path is not None:
-        for file in os.listdir(offline_path + "/rew"): # rew and traj are the same
-            if file == "bash.sh":
-                pass
-            else:
-                rew_path = offline_path + "/rew/" + file
-                traj_path = offline_path + "/traj/" + file
-                rew_content = pickle.load(open(rew_path, "rb"))
-                traj_content = pickle.load(open(traj_path, "rb"))
+#     if offline_path is not None:
+#         for file in os.listdir(offline_path + "/rew"): # rew and traj are the same
+#             if file == "bash.sh":
+#                 pass
+#             else:
+#                 rew_path = offline_path + "/rew/" + file
+#                 traj_path = offline_path + "/traj/" + file
+#                 rew_content = pickle.load(open(rew_path, "rb"))
+#                 traj_content = pickle.load(open(traj_path, "rb"))
                 
-                if min_traj_len:
-                    new_traj_content = []
-                    for i in range(len(traj_content)):
-                        if len(traj_content[i]) >= min_traj_len:
-                            new_traj_content.append(traj_content[i])
-                    traj_content = new_traj_content
+#                 if min_traj_len:
+#                     new_traj_content = []
+#                     for i in range(len(traj_content)):
+#                         if len(traj_content[i]) >= min_traj_len:
+#                             new_traj_content.append(traj_content[i])
+#                     traj_content = new_traj_content
                 
-                list_of_trajectories.append(traj_content)
-                list_of_rewards.append(rew_content)
+#                 list_of_trajectories.append(traj_content)
+#                 list_of_rewards.append(rew_content)
 
-                all_fractures, corre_traj = create_fractures(traj_content, env_name,
-                                                             vae_path=vae_path, fracos_agent=method,
-                                                             a_pre_enc=False, chain_length=chain_length)
-                concat_fractures = sum(all_fractures, [])
+#                 all_fractures, corre_traj = create_fractures(traj_content, env_name,
+#                                                              vae_path=vae_path, fracos_agent=method,
+#                                                              a_pre_enc=False, chain_length=chain_length)
+#                 concat_fractures = sum(all_fractures, [])
                 
-                list_of_concat_fractures.append(concat_fractures)
-                list_of_fractures.append(all_fractures)
+#                 list_of_concat_fractures.append(concat_fractures)
+#                 list_of_fractures.append(all_fractures)
         
-        print("loaded trajectories")
-        labels = ["Optimal"]
+#         print("loaded trajectories")
+#         labels = ["Optimal"]
         
-    else:
+#     else:
         
-        ## no trained 
-        start_env = copy.deepcopy(env)
-        plt.imshow(env.env_master.domain)
-        plt.savefig("umap_images/{}_one_level_domain.svg".format(env_name), format="svg")
-        plt.clf()
+#         ## no trained 
+#         start_env = copy.deepcopy(env)
+#         plt.imshow(env.env_master.domain)
+#         plt.savefig("umap_images/{}_one_level_domain.svg".format(env_name), format="svg")
+#         plt.clf()
         
-        if include_rand_agent:
-            optimal_trajectories, optimal_ep_rewards = create_even_trajectories(method, max_timesteps,
-                                                           None, start_env, max_ep_length=250,
-                                                           obs_space=False, evalu=evalu, rew_gen_meta=rew_gen_meta,
-                                                           one_level=one_level)
+#         if include_rand_agent:
+#             optimal_trajectories, optimal_ep_rewards = create_even_trajectories(method, max_timesteps,
+#                                                            None, start_env, max_ep_length=250,
+#                                                            obs_space=False, evalu=evalu, rew_gen_meta=rew_gen_meta,
+#                                                            one_level=one_level)
             
-            list_of_trajectories.append(optimal_trajectories)
-            list_of_rewards.append(optimal_ep_rewards)
+#             list_of_trajectories.append(optimal_trajectories)
+#             list_of_rewards.append(optimal_ep_rewards)
     
-            all_fractures, corre_traj = create_fractures(optimal_trajectories, env_name,
-                                                         vae_path=vae_path, fracos_agent=method,
-                                                         a_pre_enc=False, chain_length=chain_length)
-            concat_fractures = sum(all_fractures, [])
+#             all_fractures, corre_traj = create_fractures(optimal_trajectories, env_name,
+#                                                          vae_path=vae_path, fracos_agent=method,
+#                                                          a_pre_enc=False, chain_length=chain_length)
+#             concat_fractures = sum(all_fractures, [])
             
-            list_of_concat_fractures.append(concat_fractures)
-            list_of_fractures.append(all_fractures)
+#             list_of_concat_fractures.append(concat_fractures)
+#             list_of_fractures.append(all_fractures)
             
-            labels.insert(0,0)
+#             labels.insert(0,0)
             
-        # start with trained
-        for model_path in checkpoints:
-            start_env = copy.deepcopy(env)
-            plt.imshow(start_env.env_master.domain)
-            plt.show()
-            if even:
-                optimal_trajectories, optimal_ep_rewards = create_even_trajectories(method, max_timesteps,
-                                                               model_path, start_env, max_ep_length=250,
-                                                               obs_space=False, evalu=evalu, rew_gen_meta=rew_gen_meta,
-                                                               one_level=one_level)
-            else:
-                optimal_trajectories, optimal_ep_rewards = create_ind_opt_trajectories(method, num_of_trajs,
-                                                                              env_name, max_ep_length=250,
-                                                                              max_train_steps=1000,
-                                                                              MAX_DEPTH=3, CURRENT_DEPTH=0, verbose=False)
+#         # start with trained
+#         for model_path in checkpoints:
+#             start_env = copy.deepcopy(env)
+#             plt.imshow(start_env.env_master.domain)
+#             plt.show()
+#             if even:
+#                 optimal_trajectories, optimal_ep_rewards = create_even_trajectories(method, max_timesteps,
+#                                                                model_path, start_env, max_ep_length=250,
+#                                                                obs_space=False, evalu=evalu, rew_gen_meta=rew_gen_meta,
+#                                                                one_level=one_level)
+#             else:
+#                 optimal_trajectories, optimal_ep_rewards = create_ind_opt_trajectories(method, num_of_trajs,
+#                                                                               env_name, max_ep_length=250,
+#                                                                               max_train_steps=1000,
+#                                                                               MAX_DEPTH=3, CURRENT_DEPTH=0, verbose=False)
         
-            list_of_trajectories.append(optimal_trajectories)
-            list_of_rewards.append(optimal_ep_rewards)
+#             list_of_trajectories.append(optimal_trajectories)
+#             list_of_rewards.append(optimal_ep_rewards)
     
-            all_fractures, corre_traj = create_fractures(optimal_trajectories, env_name,
-                                                         vae_path=vae_path, fracos_agent=method,
-                                                         a_pre_enc=False, chain_length=chain_length)
-            concat_fractures = sum(all_fractures, [])
+#             all_fractures, corre_traj = create_fractures(optimal_trajectories, env_name,
+#                                                          vae_path=vae_path, fracos_agent=method,
+#                                                          a_pre_enc=False, chain_length=chain_length)
+#             concat_fractures = sum(all_fractures, [])
             
-            list_of_concat_fractures.append(concat_fractures)
-            list_of_fractures.append(all_fractures)
+#             list_of_concat_fractures.append(concat_fractures)
+#             list_of_fractures.append(all_fractures)
             
-            print(model_path + " completed")
+#             print(model_path + " completed")
         
-    pre_umap = sum(list_of_concat_fractures, [])
-    embedding, reducer = umap_reduction(pre_umap)
+#     pre_umap = sum(list_of_concat_fractures, [])
+#     embedding, reducer = umap_reduction(pre_umap)
     
-    if umap_save_location is not None:
-        pickle.dump(embedding, open( umap_save_location, "wb" ))
+#     if umap_save_location is not None:
+#         pickle.dump(embedding, open( umap_save_location, "wb" ))
     
-    x = embedding[:,0]
-    y = embedding[:,1]
+#     x = embedding[:,0]
+#     y = embedding[:,1]
     
-    if offline_path is not None:
-        plt.scatter(x, y, s=2, label="Optimal")
-        plt.title("{} fracture visulisations optimal".format(env_name))
-        plt.legend(bbox_to_anchor=(1, 1))
-        # plt.xlim(-40,40)
-        # plt.ylim(-40,40)
-        plt.savefig("umap_images/{}_all_offline_optimal.svg".format(env_name), format="svg")
-        plt.show()
-    else:
-        counter = 0
-        for i in range(len(list_of_concat_fractures)):
-            embedding_plot_help_x = []
-            embedding_plot_help_y = []
-            for j in range(len(list_of_concat_fractures[i])):
-                embedding_plot_help_x.append(x[counter])
-                embedding_plot_help_y.append(y[counter])
-                counter += 1
+#     if offline_path is not None:
+#         plt.scatter(x, y, s=2, label="Optimal")
+#         plt.title("{} fracture visulisations optimal".format(env_name))
+#         plt.legend(bbox_to_anchor=(1, 1))
+#         # plt.xlim(-40,40)
+#         # plt.ylim(-40,40)
+#         plt.savefig("umap_images/{}_all_offline_optimal.svg".format(env_name), format="svg")
+#         plt.show()
+#     else:
+#         counter = 0
+#         for i in range(len(list_of_concat_fractures)):
+#             embedding_plot_help_x = []
+#             embedding_plot_help_y = []
+#             for j in range(len(list_of_concat_fractures[i])):
+#                 embedding_plot_help_x.append(x[counter])
+#                 embedding_plot_help_y.append(y[counter])
+#                 counter += 1
             
-            plt.scatter(embedding_plot_help_x, embedding_plot_help_y, s=2, label=(labels[i]), color=colors[i])
+#             plt.scatter(embedding_plot_help_x, embedding_plot_help_y, s=2, label=(labels[i]), color=colors[i])
         
-        plt.title("{} fracture visulisations".format(env_name))
-        plt.legend(bbox_to_anchor=(1, 1))
-        # plt.xlim(-40,40)
-        # plt.ylim(-40,40)
-        plt.savefig("umap_images/{}_all.svg".format(env_name), format="svg")
-        plt.show()
-        plt.clf()
+#         plt.title("{} fracture visulisations".format(env_name))
+#         plt.legend(bbox_to_anchor=(1, 1))
+#         # plt.xlim(-40,40)
+#         # plt.ylim(-40,40)
+#         plt.savefig("umap_images/{}_all.svg".format(env_name), format="svg")
+#         plt.show()
+#         plt.clf()
         
-        ## Plot each individually too:
-        counter = 0
-        for i in range(len(list_of_concat_fractures)):
-            embedding_plot_help_x = []
-            embedding_plot_help_y = []
-            for j in range(len(list_of_concat_fractures[i])):
-                embedding_plot_help_x.append(x[counter])
-                embedding_plot_help_y.append(y[counter])
-                counter += 1
+#         ## Plot each individually too:
+#         counter = 0
+#         for i in range(len(list_of_concat_fractures)):
+#             embedding_plot_help_x = []
+#             embedding_plot_help_y = []
+#             for j in range(len(list_of_concat_fractures[i])):
+#                 embedding_plot_help_x.append(x[counter])
+#                 embedding_plot_help_y.append(y[counter])
+#                 counter += 1
             
-            plt.scatter(embedding_plot_help_x, embedding_plot_help_y, s=2, label=(labels[i]), color=colors[i])
+#             plt.scatter(embedding_plot_help_x, embedding_plot_help_y, s=2, label=(labels[i]), color=colors[i])
         
-            plt.title("{} fracture visulisations".format(env_name))
-            plt.legend(bbox_to_anchor=(1, 1))
-            # plt.xlim(-40,40)
-            # plt.ylim(-40,40)
-            plt.savefig("umap_images/{}_{}.svg".format(env_name, labels[i]), format="svg")
-            plt.show()
-            plt.clf()
+#             plt.title("{} fracture visulisations".format(env_name))
+#             plt.legend(bbox_to_anchor=(1, 1))
+#             # plt.xlim(-40,40)
+#             # plt.ylim(-40,40)
+#             plt.savefig("umap_images/{}_{}.svg".format(env_name, labels[i]), format="svg")
+#             plt.show()
+#             plt.clf()
         
-    return list_of_trajectories, list_of_rewards, list_of_fractures, embedding, reducer
+#     return list_of_trajectories, list_of_rewards, list_of_fractures, embedding, reducer
 
 def plot_umap(umap_embedding, all_s_f, env_name=""):
     """Takes a tSNE reduced data and the all_s_f files and plots."""
