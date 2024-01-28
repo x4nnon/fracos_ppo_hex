@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import sys
 sys.path.append("MetaGridEnv/MetaGridEnv")
-# sys.path.append("/home/x4nno/Documents/PhD/FRACOs_v6")
+sys.path.append("/app")
 
 import gymnasium as gym
 import numpy as np
