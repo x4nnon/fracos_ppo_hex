@@ -7,6 +7,7 @@ from datetime import datetime
 import sys
 sys.path.append("MetaGridEnv/MetaGridEnv")
 sys.path.append("/app")
+sys.path.append("/app/fracos_ppo_hex")
 
 import gymnasium as gym
 import numpy as np
