@@ -19,5 +19,9 @@ RUN apt-get install --only-upgrade libstdc++6
 RUN pip install MetaGridEnv/
 RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 RUN pip install IPython
+RUN pip install importlib-metadata
+
 
 # Need to then do: 'wandb login'. and paste the api key.
+
+# saved as tc2034/fracos_ppo
