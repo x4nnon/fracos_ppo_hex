@@ -44,6 +44,7 @@ class MetaGridEnv(gym.Env):
                                                      style=self.style, seed=self.rand_seed)
         
         self.done = self.env_master.done
+        self.train = True
         
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
@@ -100,7 +101,7 @@ class MetaGridEnv(gym.Env):
     def get_info(self):
         return {"info": "Info not implemented"}
     
-    def reset(self, goal_choice=[], start_same=False, total_random=False, seed=None, options=None):
+    def reset(self, goal_choice=[], start_same=False, total_random=False, seed=None, options=None, train=True):
         if seed:
             self.seed(seed)
             
@@ -113,7 +114,8 @@ class MetaGridEnv(gym.Env):
         
         self.env_master.reset(goal_choice=goal_choice,
                        start_same=start_same, 
-                       total_random=total_random)
+                       total_random=total_random,
+                       train=self.train)
         
         self.done = self.env_master.done
         self._elapsed_steps = 0

@@ -6,6 +6,8 @@ RUN yes | source /opt/conda/etc/profile.d/conda.sh
 RUN yes | conda activate main
 
 RUN yes | pip install -r cleanrl/requirements/requirements.txt 
+RUN yes | pip uninstall gymnasium
+RUN yes | pip install gymnasium/
 RUN yes | pip install scikit-learn
 RUN yes | pip install imblearn
 RUN yes | conda install conda-forge::hdbscan

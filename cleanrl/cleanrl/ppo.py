@@ -34,15 +34,15 @@ register( id="MetaGridEnv/metagrid-v0",
 class Args:
     exp_name: str = os.path.basename(__file__)[: -len(".py")]
     """the name of this experiment"""
-    seed: int = 1
+    seed: int = 3
     """seed of the experiment"""
-    torch_deterministic: bool = True
+    torch_deterministic: bool = False
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
     cuda: bool = True
     """if toggled, cuda will be enabled by default"""
     track: bool = True #!!! change
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "MetaGridEnv_shuffle"
+    wandb_project_name: str = "LunarLander_fracos"
     """the wandb's project name"""
     wandb_entity: str = "tpcannon"
     """the entity (team) of wandb's project"""
@@ -50,15 +50,15 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "MetaGridEnv/metagrid-v0"
+    env_id: str = "LunarLander-v2"
     """the id of the environment"""
-    total_timesteps: int = 200000
+    total_timesteps: int = 400000
     """total timesteps of the experiments"""
     learning_rate: float = 5e-3
     """the learning rate of the optimizer"""
     num_envs: int = 16
     """the number of parallel game environments"""
-    num_steps: int = 128
+    num_steps: int = 512
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -76,7 +76,7 @@ class Args:
     """the surrogate clipping coefficient"""
     clip_vloss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.1
+    ent_coef: float = 0.2
     """coefficient of the entropy"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
@@ -86,6 +86,9 @@ class Args:
     """the target KL divergence threshold"""
     report_epoch: int = num_steps*num_envs
     """When to run a seperate epoch run to be reported. Make sure this is a multple of num_envs."""
+    anneal_ent: bool = True
+    """Toggle entropy coeff annealing"""
+
 
     # to be filled in runtime
     batch_size: int = 0
@@ -96,9 +99,9 @@ class Args:
     """the number of iterations (computed in runtime)"""
     
     # Below are fracos specific
-    max_clusters_per_clusterer: int = 10
+    max_clusters_per_clusterer: int = 25
     """the maximum number of clusters at each hierarchy level"""
-    current_depth: int = 1
+    current_depth: int = 2
     """this is the current level of hierarchy we are considering"""
     chain_length: int = 2
     """How long our option chains are"""
@@ -293,7 +296,7 @@ class FraCOsAgent(nn.Module):
         if "MetaGridEnv" in self.env_id:
             cluster_dir = "fracos_clusters/MetaGridEnv"
         else:
-            cluster_dir = "fracos_cluster/{}".format(self.env_id)
+            cluster_dir = "fracos_clusters/{}".format(self.env_id)
             
             
         # check if exists and then make if not 
@@ -609,6 +612,12 @@ if __name__ == "__main__":
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
+        if args.anneal_ent:
+            frac = 1.0 - (iteration - 1.0) / args.num_iterations
+            ent_coef_now = frac * args.ent_coef
+        else:
+            ent_coef_now = args.ent_coef
+            
 
         for step in range(0, args.num_steps):
             
@@ -627,15 +636,24 @@ if __name__ == "__main__":
             # logprobs.append(logprob)
 
             # TRY NOT TO MODIFY: execute the game and log data. !!! unfortunatly I need to modify
+            # new style
+            
             next_obs, reward, terminations, truncations, infos, total_steps_taken = envs.fracos_step_async(action.cpu().numpy(), next_obs, agent)
-            # next_obs, reward, terminations, truncations, infos \
-            #     , obs, actions, logprobs, rewards, dones, values \
-            #     = envs.fracos_step_async(action.cpu().numpy(), next_obs, next_done, agent,
-            #                              obs, actions, 
-            #                              logprobs, rewards, dones, values)
+            global_step_truth += sum(total_steps_taken)
+            
+            # new style end 
+            
+            
+            # old style
+
             # next_obs, reward, terminations, truncations, infos = envs.step(action.cpu().numpy())
             
-            global_step_truth += sum(total_steps_taken)
+            # total_steps_taken = [step]
+            # global_step_truth += args.num_envs
+            
+            # end old_style
+            
+            
             global_decisions += args.num_envs 
             
             next_done = np.logical_or(terminations, truncations)
@@ -654,8 +672,9 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     epoch_len = args.report_epoch
                     test_envs = copy.deepcopy(envs)
-                    test_seed = random.randint(1001,2000) #makes sure that the random int for train is below 1000
-                    test_next_obs, _ = test_envs.reset(seed=test_seed) # random seedings
+                    test_envs.train = False
+                    # test_seed = random.randint(1001,2000) #makes sure that the random int for train is below 1000
+                    test_next_obs, _ = test_envs.reset() # random seedings
                     test_next_obs = torch.Tensor(test_next_obs).to(device)
                     all_test_rewards = 0
                     for ts in range(int(epoch_len/args.num_envs)):
@@ -687,6 +706,7 @@ if __name__ == "__main__":
                 # only changes for the update step and not for the reporting.
                 # !!! MUST CHANGE THIS DEPENDANT ON ENVIRONEMENT !!!
                 adjusted_rewards = rewards[t]
+                # !!! for MetaGrid unhash this. For LL hash -- ideally we could do this for LL but unsure of complex rewards
                 for i in range(len(adjusted_rewards)):
                     if -0.001 > adjusted_rewards[i] > -0.1:
                         adjusted_rewards[i] = -0.01
@@ -747,7 +767,7 @@ if __name__ == "__main__":
                     v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
 
                 entropy_loss = entropy.mean()
-                loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
+                loss = pg_loss - ent_coef_now * entropy_loss + v_loss * args.vf_coef
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -772,6 +792,7 @@ if __name__ == "__main__":
         writer.add_scalar("losses/explained_variance", explained_var, global_decisions)
         print("SPS:", int(global_step_truth / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step_truth / (time.time() - start_time)), global_step_truth)
+        writer.add_scalar("charts/decisions", global_decisions, global_step_truth)
 
         if global_step_truth >= args.total_timesteps:
             break

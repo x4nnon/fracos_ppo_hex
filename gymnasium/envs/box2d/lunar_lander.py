@@ -11,7 +11,7 @@ from gymnasium import error, spaces
 from gymnasium.error import DependencyNotInstalled
 from gymnasium.utils import EzPickle, colorize
 from gymnasium.utils.step_api_compatibility import step_api_compatibility
-
+import time
 
 try:
     import Box2D
@@ -278,6 +278,8 @@ class LunarLander(gym.Env, EzPickle):
         self.moon = None
         self.lander: Optional[Box2D.b2Body] = None
         self.particles = []
+        
+        self.max_ep_length = 1000
 
         self.prev_reward = None
 
@@ -354,6 +356,12 @@ class LunarLander(gym.Env, EzPickle):
         self.world.contactListener = self.world.contactListener_keepref
         self.game_over = False
         self.prev_shaping = None
+        
+        self.episode_start_times = np.full(
+            1, time.perf_counter(), dtype=np.float32
+        )
+        self.episode_returns = np.zeros(1, dtype=np.float32)
+        self.episode_lengths = np.zeros(1, dtype=np.int32)
 
         W = VIEWPORT_W / SCALE
         H = VIEWPORT_H / SCALE
@@ -488,6 +496,9 @@ class LunarLander(gym.Env, EzPickle):
 
         # Update wind and apply to the lander
         assert self.lander is not None, "You forgot to call reset()"
+        
+        info = {}
+        
         if self.enable_wind and not (
             self.legs[0].ground_contact or self.legs[1].ground_contact
         ):
@@ -673,7 +684,77 @@ class LunarLander(gym.Env, EzPickle):
 
         if self.render_mode == "human":
             self.render()
-        return np.array(state, dtype=np.float32), reward, terminated, False, {}
+        
+        self.episode_returns += reward
+        self.episode_lengths += 1
+        if self.episode_lengths > self.max_ep_length:
+            truncated = True
+        else:
+            truncated= False
+            
+        dones = np.logical_or(terminated, truncated)
+        num_dones = np.sum(dones)
+        if num_dones:
+            if "episode" in info or "_episode" in info:
+                raise ValueError(
+                    "Attempted to add episode stats when they already exist"
+                )
+            else:
+                info["episode"] = {
+                    "r": np.where(dones, self.episode_returns, 0.0),
+                    "l": np.where(dones, self.episode_lengths, 0),
+                    "t": np.where(
+                        dones,
+                        np.round(time.perf_counter() - self.episode_start_times, 6),
+                        0.0,
+                    ),
+                }    
+        
+        return np.array(state, dtype=np.float32), reward, terminated, truncated, info
+    
+    
+    def fracos_step(self, action, next_ob, agent, total_rewards=0, total_steps_taken=0):
+        """This needs to manage recursively taking actions"""
+        # !!! Need to add in tracking of the steps -- unless this is done in the infos.
+        
+        
+        try:
+            ob = tuple(next_ob.cpu().numpy())
+        except:
+            ob = tuple(next_ob)
+        
+        if action not in range(agent.action_prims):
+            if ob not in agent.discrete_search_cache.keys():
+                agent.initial_search(ob)
+            id_actions = tuple(agent.discrete_search_cache[ob][action])
+            if isinstance(id_actions[0], np.ndarray):
+                for id_action in id_actions:
+                    for reverse_cypher in agent.reverse_cyphers:
+                        if tuple(id_action) in reverse_cypher.keys():
+                            id_action = reverse_cypher[tuple(id_action)]
+                            break
+    
+                    next_ob, total_rewards, termination, truncation, info, total_steps_taken = \
+                        self.fracos_step(id_action, next_ob, agent, total_rewards=total_rewards, total_steps_taken=total_steps_taken)
+                        
+                    # need to exit if we have finished
+                    next_done = np.logical_or(termination, truncation)
+                    if next_done:
+                        return next_ob, total_rewards, termination, truncation, info, total_steps_taken
+                        
+            else:
+                # returns a negative reward and our current location.
+                return next_ob, -0.1, False, None, {"not implemented" : []}, total_steps_taken
+        else:
+            next_ob, reward, termination, truncation, info = self.step(action)
+            total_rewards += reward
+            total_steps_taken += 1
+            next_done = np.logical_or(termination, truncation)
+            if next_done:
+                return next_ob, total_rewards, termination, truncation, info, total_steps_taken
+            
+        return next_ob, total_rewards, termination, truncation, info, total_steps_taken
+    
 
     def render(self):
         if self.render_mode is None:

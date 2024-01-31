@@ -96,9 +96,10 @@ class RecordEpisodeStatistics(gym.Wrapper, gym.utils.RecordConstructorArgs):
         num_dones = np.sum(dones)
         if num_dones:
             if "episode" in infos or "_episode" in infos:
-                raise ValueError(
-                    "Attempted to add episode stats when they already exist"
-                )
+                pass
+                # raise ValueError(
+                #     "Attempted to add episode stats when they already exist"
+                # )
             else:
                 infos["episode"] = {
                     "r": np.where(dones, self.episode_returns, 0.0),
