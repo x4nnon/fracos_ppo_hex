@@ -744,7 +744,7 @@ class LunarLander(gym.Env, EzPickle):
                         
             else:
                 # returns a negative reward and our current location.
-                return next_ob, -0.1, False, None, {"not implemented" : []}, total_steps_taken
+                return ob, -0.1, False, None, {"not implemented" : []}, total_steps_taken
         else:
             next_ob, reward, termination, truncation, info = self.step(action)
             total_rewards += reward
