@@ -8,6 +8,7 @@ import sys
 sys.path.append("MetaGridEnv/MetaGridEnv")
 sys.path.append("/app")
 sys.path.append("/app/fracos_ppo_hex")
+sys.path.append("/opt/conda/envs/main/lib/python3.9/site-packages")
 
 import gymnasium as gym
 import numpy as np
