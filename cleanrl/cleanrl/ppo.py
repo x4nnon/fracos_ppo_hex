@@ -5,10 +5,8 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 import sys
-sys.path.append("MetaGridEnv/MetaGridEnv")
-sys.path.append("/app")
-sys.path.append("/app/fracos_ppo_hex")
-sys.path.append("/opt/conda/envs/main/lib/python3.9/site-packages")
+sys.path.append("/home/x4nno/Documents/PhD/MetaGridEnv/MetaGridEnv")
+sys.path.append("/home/x4nno/Documents/PhD/FRACOs_v6")
 
 import gymnasium as gym
 import numpy as np
@@ -22,7 +20,7 @@ import pickle
 from utils.clustering import torch_classifier
 import hdbscan 
 import copy
-
+import numba
 
 import MetaGridEnv 
 from gym.envs.registration import register 
@@ -43,7 +41,7 @@ class Args:
     """if toggled, cuda will be enabled by default"""
     track: bool = True #!!! change
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "LunarLander_fracos"
+    wandb_project_name: str = "MetaGridEnv_shuffle"
     """the wandb's project name"""
     wandb_entity: str = "tpcannon"
     """the entity (team) of wandb's project"""
@@ -51,15 +49,15 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "LunarLander-v2"
+    env_id: str = "MetaGridEnv/metagrid-v0"
     """the id of the environment"""
-    total_timesteps: int = 400000
+    total_timesteps: int = 200000
     """total timesteps of the experiments"""
     learning_rate: float = 5e-3
     """the learning rate of the optimizer"""
     num_envs: int = 16
     """the number of parallel game environments"""
-    num_steps: int = 512
+    num_steps: int = 128
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
     """Toggle learning rate annealing for policy and value networks"""
@@ -106,9 +104,9 @@ class Args:
     """this is the current level of hierarchy we are considering"""
     chain_length: int = 2
     """How long our option chains are"""
-    NN_cluster_search: bool = True
+    NN_cluster_search: bool = False
     """Should we use NN to predict our clusters? if false will use hdbscan"""
-    gen_strength: float = 0.05
+    gen_strength: float = 0.33
     """This should be the strength of generalisation. for NN 0.1 seems good. for hdbscan 0.33"""    
     FraCOs_bias_factor: float = 10.0
     """How much to multiply the logit by to bias towards choosing the identified fracos"""
@@ -395,93 +393,94 @@ class FraCOsAgent(nn.Module):
                         
     
     def initial_search(self, state):
-        # We should be able to speed up the initial search -- it it very slow.
-
-        # for debug / checking that the search makes sense.
-        # compare with available clusters
-        
-        # plt.imshow(self.decoder(torch.tensor(state[:8]).to(device)).cpu().detach().numpy().reshape(7,7))
-        # plt.show()
-        # print(state[8:10]) 
-        
-        self.discrete_search_cache[state] = {}
-        clstr_a_count = self.action_prims
-
-        for clstrr_idx in range(len(self.clusterers)):
-            # clustrr_idx will now correspond to those in the 
-            # all possible action combs, and we want to search through all.
-            search_terms = []
-
-            apac_arr = self.apac_arr[clstrr_idx]
+        with torch.no_grad():
+            # We should be able to speed up the initial search -- it it very slow.
+    
+            # for debug / checking that the search makes sense.
+            # compare with available clusters
             
-            search_state = state
-            search_state = np.array(search_state)
+            # plt.imshow(self.decoder(torch.tensor(state[:8]).to(device)).cpu().detach().numpy().reshape(7,7))
+            # plt.show()
+            # print(state[8:10]) 
             
-            # we should be able to speed this up?
-            search_state_tile = np.tile(search_state, 
-                                        (len(self.all_possible_action_combs[clstrr_idx]),1))
-            
-            search_terms = np.hstack((search_state_tile, apac_arr))
-
-            # Search within our indicative clusterer
-            if self.NN_cluster_search:
-                search_terms = torch.tensor(search_terms)
-                search_terms = search_terms.float()
-                search_terms = search_terms.to(device)
-                with torch.inference_mode():
-                    predict_proba = self.clstrr_NNs[clstrr_idx](search_terms).squeeze()
-                # print("after preds = ", time.perf_counter()-NN_before)
-                cluster_labels = torch.softmax(predict_proba, dim=1).argmax(dim=1)
-                # print("after softmax =", time.perf_counter()-NN_before)
-                cluster_labels = cluster_labels.cpu()
-                # print("after to cpu =", time.perf_counter()-NN_before)
-                strengths = np.max(np.array(torch.softmax(predict_proba.cpu().detach(), dim=1).cpu()), axis=1)
-
-            else:
-                cluster_labels, strengths = hdbscan.approximate_predict(self.clusterers[clstrr_idx], search_terms)
-
-            cluster_labels = np.array(cluster_labels)
-            
-            # update to the discrete search?
-            # need to use the cypher at the current depth for this
-            
-            
-            for clstr_idx in range(len(self.clusters[clstrr_idx])):
-                cypher_action = self.cyphers[self.current_depth][clstr_a_count]
-                cypher_action = tuple(cypher_action)
-                clstr_a_count += 1
+            self.discrete_search_cache[state] = {}
+            clstr_a_count = self.action_prims
+    
+            for clstrr_idx in range(len(self.clusterers)):
+                # clustrr_idx will now correspond to those in the 
+                # all possible action combs, and we want to search through all.
+                search_terms = []
+    
+                apac_arr = self.apac_arr[clstrr_idx]
                 
-                action = self.reverse_cyphers[self.current_depth][cypher_action]
-                self.discrete_search_cache[state][action] = [None, None]
-                top_strength = 0
-                best_action_pair_match = [None, None]
-                if (self.clusters[clstrr_idx][clstr_idx] in cluster_labels):
-                        
-                    indexes = np.where(cluster_labels == self.clusters[clstrr_idx][clstr_idx])
-                    
-                    
-                    for idx in indexes[0]:
-                        c_strength = strengths[idx]
-                        action_pair = self.all_possible_action_combs[clstrr_idx][idx]
-                        if (c_strength > top_strength) & (c_strength >= 1-self.gen_strength):
-                            top_strength = c_strength
-                            best_action_pair_match = action_pair
-                        
+                search_state = state
+                search_state = np.array(search_state)
+                
+                # we should be able to speed this up?
+                search_state_tile = np.tile(search_state, 
+                                            (len(self.all_possible_action_combs[clstrr_idx]),1))
+                
+                search_terms = np.hstack((search_state_tile, apac_arr))
+    
+                # Search within our indicative clusterer
+                if self.NN_cluster_search:
+                    search_terms = torch.tensor(search_terms)
+                    search_terms = search_terms.float()
+                    search_terms = search_terms.to(device)
+                    with torch.inference_mode():
+                        predict_proba = self.clstrr_NNs[clstrr_idx](search_terms).squeeze()
+                    # print("after preds = ", time.perf_counter()-NN_before)
+                    cluster_labels = torch.softmax(predict_proba, dim=1).argmax(dim=1)
+                    # print("after softmax =", time.perf_counter()-NN_before)
+                    cluster_labels = cluster_labels.cpu()
+                    # print("after to cpu =", time.perf_counter()-NN_before)
+                    strengths = np.max(np.array(torch.softmax(predict_proba.cpu().detach(), dim=1).cpu()), axis=1)
+    
                 else:
-                    pass
-                            
-                final_best_action_pair_match = []
-                if best_action_pair_match[0] is not None:
-                    for ba in best_action_pair_match:
-                        # Turn back to a number
-                        ba_n = self.reverse_cyphers[clstrr_idx][tuple(ba)]
-                        # Turn into the correct cypher 
-                        ba_c = self.cyphers[self.current_depth][ba_n]
-                        final_best_action_pair_match.append(ba_c)
-                else: final_best_action_pair_match = best_action_pair_match
+                    cluster_labels, strengths = hdbscan.approximate_predict(self.clusterers[clstrr_idx], search_terms)
+    
+                cluster_labels = np.array(cluster_labels)
                 
-                self.discrete_search_cache[state][action] = final_best_action_pair_match
+                # update to the discrete search?
+                # need to use the cypher at the current depth for this
+                
+                
+                for clstr_idx in range(len(self.clusters[clstrr_idx])):
+                    cypher_action = self.cyphers[self.current_depth][clstr_a_count]
+                    cypher_action = tuple(cypher_action)
+                    clstr_a_count += 1
                     
+                    action = self.reverse_cyphers[self.current_depth][cypher_action]
+                    self.discrete_search_cache[state][action] = [None, None]
+                    top_strength = 0
+                    best_action_pair_match = [None, None]
+                    if (self.clusters[clstrr_idx][clstr_idx] in cluster_labels):
+                            
+                        indexes = np.where(cluster_labels == self.clusters[clstrr_idx][clstr_idx])
+                        
+                        
+                        for idx in indexes[0]:
+                            c_strength = strengths[idx]
+                            action_pair = self.all_possible_action_combs[clstrr_idx][idx]
+                            if (c_strength > top_strength) & (c_strength >= 1-self.gen_strength):
+                                top_strength = c_strength
+                                best_action_pair_match = action_pair
+                            
+                    else:
+                        pass
+                                
+                    final_best_action_pair_match = []
+                    if best_action_pair_match[0] is not None:
+                        for ba in best_action_pair_match:
+                            # Turn back to a number
+                            ba_n = self.reverse_cyphers[clstrr_idx][tuple(ba)]
+                            # Turn into the correct cypher 
+                            ba_c = self.cyphers[self.current_depth][ba_n]
+                            final_best_action_pair_match.append(ba_c)
+                    else: final_best_action_pair_match = best_action_pair_match
+                    
+                    self.discrete_search_cache[state][action] = final_best_action_pair_match
+                        
                     
                     
                         
@@ -490,7 +489,9 @@ class FraCOsAgent(nn.Module):
     def get_value(self, x):
         return self.critic(x)
 
-    def get_action_and_value(self, x, action=None):
+    
+    # @numba.jit()
+    def get_action_and_value(self, x, action=None, fracos_bias_factor=1):
         
         # we have vectorized environments so we need to extract the information here?
         x_idx = 0
@@ -505,25 +506,58 @@ class FraCOsAgent(nn.Module):
                 self.initial_search(x_tuple)
             
             # find available_actions
-            available_actions = []
-            for pot_a in self.discrete_search_cache[x_tuple].keys():
-                if isinstance(self.discrete_search_cache[x_tuple][pot_a][0], np.ndarray):
-                    available_actions.append(pot_a)
             
-            available_actions = list(available_actions)
-            for i in range(self.action_prims): 
-                available_actions.append(i)
+            ## -------- old way ------------
+            
+            # old_start = time.time()
+            
+            # available_actions = []
+            # for pot_a in self.discrete_search_cache[x_tuple].keys():
+            #     if isinstance(self.discrete_search_cache[x_tuple][pot_a][0], np.ndarray):
+            #         available_actions.append(pot_a)
+            
+            # available_actions = list(available_actions)
+            # for i in range(self.action_prims): 
+            #     available_actions.append(i)
+                
+            # old_end = time.time()
+            # print("old time = ", old_end-old_start)
+            
+            ## -------- oldway end
+                
+            # new_start = time.time()
+            available_actions = [pot_a for pot_a, values in self.discrete_search_cache[x_tuple].items() if isinstance(values[0], np.ndarray)]
+            available_actions.extend(range(self.action_prims))
+            # new_end = time.time()
+            # print("new time = ", new_end-new_start )
             
             
-            # we should change the logits to only have those which are available?
-            for i in range(len(logits[x_idx])):
-                if i not in available_actions:
-                    logits[x_idx][i] = -1e6
-                elif i > self.action_prims:
-                    if logits[x_idx][i] < 0:
-                        logits[x_idx][i] = logits[x_idx][i]/args.FraCOs_bias_factor
-                    else:
-                        logits[x_idx][i] = logits[x_idx][i]*args.FraCOs_bias_factor # logits can be negative too ..
+            # much faster for depth == 0
+            if args.current_depth == 0:
+                for i in range(len(logits[x_idx])):
+                    if i not in available_actions:
+                        logits[x_idx][i] = -1e6
+                    elif i > self.action_prims:
+                        if logits[x_idx][i] < 0:
+                            logits[x_idx][i] = logits[x_idx][i]/fracos_bias_factor
+                        else:
+                            logits[x_idx][i] = logits[x_idx][i]*fracos_bias_factor # logits can be negative too ..
+            
+            # much faster for depth > 0
+            else:
+                for i in available_actions: # indexing the logits
+                    if i > self.action_prims:
+                        if logits[x_idx][i] < 0:
+                            logits[x_idx][i] = logits[x_idx][i]/fracos_bias_factor
+                        else:
+                            logits[x_idx][i] = logits[x_idx][i]*fracos_bias_factor
+                            
+                mask = ~np.isin(np.arange(len(logits[x_idx])), available_actions)
+                indexes_not_in_exclusion_list = np.where(mask)[0]
+                logits[x_idx][indexes_not_in_exclusion_list] = -1e6
+            
+            # new_end = time.time()
+            # print("new time = ", new_end-new_start)
             
             x_idx += 1
             
@@ -619,7 +653,6 @@ if __name__ == "__main__":
         else:
             ent_coef_now = args.ent_coef
             
-
         for step in range(0, args.num_steps):
             
             obs[step] = next_obs
@@ -629,7 +662,7 @@ if __name__ == "__main__":
 
             # ALGO LOGIC: action logic
             with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(next_obs)
+                action, logprob, _, value = agent.get_action_and_value(next_obs, fracos_bias_factor=args.FraCOs_bias_factor)
                 values[step] = value.flatten()
             actions[step] = action
             # actions.append(action)
@@ -679,7 +712,7 @@ if __name__ == "__main__":
                     test_next_obs = torch.Tensor(test_next_obs).to(device)
                     all_test_rewards = 0
                     for ts in range(int(epoch_len/args.num_envs)):
-                        test_action, test_logprob, _, test_value = agent.get_action_and_value(test_next_obs)
+                        test_action, test_logprob, _, test_value = agent.get_action_and_value(test_next_obs, fracos_bias_factor=args.FraCOs_bias_factor)
                         test_next_obs, test_reward, test_terminations, test_truncations, test_infos, total_steps_taken = envs.fracos_step_async(test_action.cpu().numpy(), test_next_obs, agent)
                         test_next_obs = torch.Tensor(test_next_obs).to(device)
                         all_test_rewards += sum(test_reward)
@@ -689,7 +722,6 @@ if __name__ == "__main__":
                     writer.add_scalar("charts/average_return_per_epoch_step", average_all_test_rewards, global_step_truth)
                     epoch += 1
                     
-
         # bootstrap value if not done
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
@@ -716,6 +748,7 @@ if __name__ == "__main__":
                 delta = adjusted_rewards + args.gamma * nextvalues * nextnonterminal - values[t]
                 advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + values
+        
 
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
@@ -734,7 +767,7 @@ if __name__ == "__main__":
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
-                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds])
+                _, newlogprob, entropy, newvalue = agent.get_action_and_value(b_obs[mb_inds], action=b_actions.long()[mb_inds], fracos_bias_factor=args.FraCOs_bias_factor)
                 logratio = newlogprob - b_logprobs[mb_inds]
                 ratio = logratio.exp()
 
@@ -782,6 +815,7 @@ if __name__ == "__main__":
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_decisions)
