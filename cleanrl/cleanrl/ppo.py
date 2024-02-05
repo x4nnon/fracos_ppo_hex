@@ -708,9 +708,10 @@ if __name__ == "__main__":
                 # !!! MUST CHANGE THIS DEPENDANT ON ENVIRONEMENT !!!
                 adjusted_rewards = rewards[t]
                 # !!! for MetaGrid unhash this. For LL hash -- ideally we could do this for LL but unsure of complex rewards
-                for i in range(len(adjusted_rewards)):
-                    if -0.001 > adjusted_rewards[i] > -0.1:
-                        adjusted_rewards[i] = -0.01
+                if "MetaGrid" in args.env_id:
+                    for i in range(len(adjusted_rewards)):
+                        if -0.001 > adjusted_rewards[i] > -0.1:
+                            adjusted_rewards[i] = -0.01
                 
                 delta = adjusted_rewards + args.gamma * nextvalues * nextnonterminal - values[t]
                 advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
