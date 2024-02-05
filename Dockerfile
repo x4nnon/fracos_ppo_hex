@@ -3,7 +3,7 @@ FROM pytorch/pytorch:1.12.1-cuda11.3-cudnn8-runtime
 # easy way to use a specific version of python
 RUN yes | conda create -n main python=3.9
 RUN cd ..
-RUN source /opt/conda/etc/profile.d/conda.sh
+RUN . /opt/conda/etc/profile.d/conda.sh
 RUN conda activate main
 
 RUN cd app/
