@@ -21,7 +21,7 @@ RUN pip3 install torch torchvision torchaudio --index-url https://download.pytor
 RUN pip install IPython
 RUN pip install importlib-metadata
 RUN pip install tyro
-RUN pip install Box2D/
+RUN pip install ufal.pybox2d
 
 # Need to then do: 'wandb login'. and paste the api key.
 
